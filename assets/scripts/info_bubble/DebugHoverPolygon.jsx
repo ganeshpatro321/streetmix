@@ -16,16 +16,15 @@ export class DebugHoverPolygon extends React.Component {
   constructor (props) {
     super(props)
 
-    this.state = {
-      width: window.innerWidth,
-      height: window.innerHeight
-    }
-
-    this.canvas = null
+    this.canvas = React.createRef()
   }
 
   componentDidMount () {
-    window.addEventListener('resize', this.updateDimensions)
+    window.addEventListener('resize', this.handleWindowResize)
+  }
+
+  componentWillUnmount () {
+    window.removeEventListener('resize', this.handleWindowResize)
   }
 
   shouldComponentUpdate () {
@@ -36,31 +35,24 @@ export class DebugHoverPolygon extends React.Component {
     this.drawPolygon()
   }
 
-  componentWillUnmount () {
-    window.removeEventListener('resize', this.updateDimensions)
-  }
-
-  updateDimensions = (event) => {
+  handleWindowResize = (event) => {
     if (this.props.enabled === false) return
 
-    this.setState({
-      width: window.innerWidth,
-      height: window.innerHeight
-    })
+    this.forceUpdate()
   }
 
   drawPolygon = () => {
     if (this.props.enabled === false) return
-    if (!this.canvas) return
+    if (!this.canvas.current) return
 
-    this.canvas.width = this.canvas.width // Setting canvas width will clear it
+    this.canvas.current.width = this.canvas.current.width // Setting canvas width will clear it
 
     const polygon = this.props.hoverPolygon
 
     // Early exit if polygon isn't set
     if (!polygon.length || !polygon[0].length) return
 
-    const ctx = this.canvas.getContext('2d')
+    const ctx = this.canvas.current.getContext('2d')
     ctx.strokeStyle = 'red'
     ctx.fillStyle = 'rgba(255, 0, 0, .1)'
     ctx.beginPath()
@@ -79,9 +71,9 @@ export class DebugHoverPolygon extends React.Component {
     return (
       <div className="debug-hover-polygon">
         <canvas
-          width={this.state.width}
-          height={this.state.height}
-          ref={(ref) => { this.canvas = ref }}
+          width={window.innerWidth}
+          height={window.innerHeight}
+          ref={this.canvas}
         />
       </div>
     )
@@ -90,8 +82,7 @@ export class DebugHoverPolygon extends React.Component {
 
 function mapStateToProps (state) {
   return {
-    enabled: state.flags.INFO_BUBBLE_HOVER_POLYGON.value,
-    hoverPolygon: state.infoBubble.hoverPolygon
+    enabled: state.flags.INFO_BUBBLE_HOVER_POLYGON.value
   }
 }
 

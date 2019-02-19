@@ -9,6 +9,7 @@ import WidthControl from './WidthControl'
 import BuildingHeightControl from './BuildingHeightControl'
 import Warnings from './Warnings'
 import Description from './Description'
+import DebugHoverPolygon from './DebugHoverPolygon'
 import { infoBubble } from './info_bubble'
 import {
   INFO_BUBBLE_TYPE_SEGMENT,
@@ -23,7 +24,7 @@ import { getSegmentInfo, getSegmentVariantInfo } from '../segments/info'
 import { getSegmentEl } from '../segments/view'
 import { loseAnyFocus } from '../util/focus'
 import { getElAbsolutePos } from '../util/helpers'
-import { setInfoBubbleMouseInside, updateHoverPolygon } from '../store/actions/infoBubble'
+import { setInfoBubbleMouseInside } from '../store/actions/infoBubble'
 import './InfoBubble.scss'
 
 const INFO_BUBBLE_MARGIN_BUBBLE = 20
@@ -44,7 +45,6 @@ class InfoBubble extends React.Component {
       PropTypes.number
     ]),
     setInfoBubbleMouseInside: PropTypes.func,
-    updateHoverPolygon: PropTypes.func,
     street: PropTypes.object,
     system: PropTypes.object,
     locale: PropTypes.object
@@ -64,7 +64,8 @@ class InfoBubble extends React.Component {
 
     this.state = {
       type: null,
-      highlightTriangle: false
+      highlightTriangle: false,
+      hoverPolygon: []
     }
 
     this.hoverPolygonUpdateTimerId = -1
@@ -140,7 +141,7 @@ class InfoBubble extends React.Component {
       document.body.removeEventListener('mousemove', this.onBodyMouseMove)
     }
 
-    this.updateHoverPolygon(infoBubble.considerMouseX, infoBubble.considerMouseY)
+    // this.updateHoverPolygon(infoBubble.considerMouseX, infoBubble.considerMouseY)
   }
 
   componentWillUnmount () {
@@ -202,8 +203,14 @@ class InfoBubble extends React.Component {
   }
 
   updateHoverPolygon = (mouseX, mouseY) => {
-    const hoverPolygon = this.createHoverPolygon(mouseX, mouseY)
-    this.props.updateHoverPolygon(hoverPolygon)
+    const polygon = this.createHoverPolygon(mouseX, mouseY)
+
+    this.setState({
+      hoverPolygon: polygon
+    })
+
+    // Legacy update
+    infoBubble.hoverPolygon = polygon
   }
 
   // TODO: make this a pure(r) function
@@ -479,38 +486,45 @@ class InfoBubble extends React.Component {
     const segment = this.props.street.segments[this.props.position] || {}
 
     return (
-      <div
-        className={classNames.join(' ')}
-        onMouseEnter={this.onMouseEnter}
-        onMouseLeave={this.onMouseLeave}
-        onTouchStart={this.onTouchStart}
-        ref={this.el}
-      >
-        <Triangle highlight={this.state.highlightTriangle} />
-        <header>
-          <div className="info-bubble-header-label">{this.getName()}</div>
-          {canBeDeleted && <RemoveButton segment={this.props.position} />}
-        </header>
-        <div className="info-bubble-controls">
-          <IntlProvider
-            locale={this.props.locale.locale}
-            messages={this.props.locale.segmentInfo}
-          >
-            <Variants type={type} position={position} />
-          </IntlProvider>
-          {widthOrHeightControl}
+      <React.Fragment>
+        <div
+          className={classNames.join(' ')}
+          onMouseEnter={this.onMouseEnter}
+          onMouseLeave={this.onMouseLeave}
+          onTouchStart={this.onTouchStart}
+          ref={this.el}
+        >
+          <Triangle highlight={this.state.highlightTriangle} />
+          <header>
+            <div className="info-bubble-header-label">{this.getName()}</div>
+            {canBeDeleted && <RemoveButton segment={this.props.position} />}
+          </header>
+          <div className="info-bubble-controls">
+            <IntlProvider
+              locale={this.props.locale.locale}
+              messages={this.props.locale.segmentInfo}
+            >
+              <Variants type={type} position={position} />
+            </IntlProvider>
+            {widthOrHeightControl}
+          </div>
+          <Warnings segment={segment} />
+          <Description
+            type={segment.type}
+            variantString={segment.variantString}
+            updateBubbleDimensions={this.updateBubbleDimensions}
+            highlightTriangle={this.highlightTriangle}
+            unhighlightTriangle={this.unhighlightTriangle}
+            infoBubbleEl={this.el.current}
+            updateHoverPolygon={this.updateHoverPolygon}
+          />
         </div>
-        <Warnings segment={segment} />
-        <Description
-          type={segment.type}
-          variantString={segment.variantString}
-          updateBubbleDimensions={this.updateBubbleDimensions}
-          highlightTriangle={this.highlightTriangle}
-          unhighlightTriangle={this.unhighlightTriangle}
-          infoBubbleEl={this.el.current}
-          updateHoverPolygon={this.updateHoverPolygon}
-        />
-      </div>
+        {this.props.visible && (
+          <DebugHoverPolygon
+            hoverPolygon={this.state.hoverPolygon}
+          />
+        )}
+      </React.Fragment>
     )
   }
 }
@@ -529,8 +543,7 @@ function mapStateToProps (state) {
 
 function mapDispatchToProps (dispatch) {
   return {
-    setInfoBubbleMouseInside: (value) => { dispatch(setInfoBubbleMouseInside(value)) },
-    updateHoverPolygon: (polygon) => { dispatch(updateHoverPolygon(polygon)) }
+    setInfoBubbleMouseInside: (value) => { dispatch(setInfoBubbleMouseInside(value)) }
   }
 }
 
